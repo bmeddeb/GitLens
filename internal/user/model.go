@@ -4,7 +4,7 @@ import "time"
 
 type User struct {
 	ID          uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	GitHubID    uint64     `gorm:"uniqueIndex:uk_users_github_id;not null" json:"github_id"`
+	GitHubID    uint64     `gorm:"column:github_id;uniqueIndex:uk_users_github_id;not null" json:"github_id"`
 	Username    string     `gorm:"uniqueIndex:uk_users_username;size:255;not null" json:"username"`
 	DisplayName *string    `gorm:"size:255" json:"display_name,omitempty"`
 	Email       *string    `gorm:"size:255" json:"email,omitempty"`
