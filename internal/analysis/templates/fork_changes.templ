@@ -1,0 +1,159 @@
+package analysistemplates
+
+import (
+	"fmt"
+	"github.com/user/gitlens-pro/internal/http/templates"
+	"github.com/user/gitlens-pro/internal/repository"
+)
+
+templ ForkChangesPage(pd templates.PageData, repoID uint64, repo *repository.Repository, fork *repository.Fork, changes []repository.ForkChange, nextCursor string) {
+	@templates.Layout(pd) {
+		@ForkChangesContent(repoID, repo, fork, changes, nextCursor)
+	}
+}
+
+templ ForkChangesContent(repoID uint64, repo *repository.Repository, fork *repository.Fork, changes []repository.ForkChange, nextCursor string) {
+	<div class="space-y-6">
+		<!-- Breadcrumb -->
+		<div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+			<a href="/repos" class="hover:text-gray-700 dark:hover:text-gray-300">Repositories</a>
+			<span>/</span>
+			<a href={ templ.SafeURL(fmt.Sprintf("/repos/%d", repoID)) } class="hover:text-gray-700 dark:hover:text-gray-300">{ repo.FullName }</a>
+			<span>/</span>
+			<a href={ templ.SafeURL(fmt.Sprintf("/repos/%d/forks", repoID)) } class="hover:text-gray-700 dark:hover:text-gray-300">Forks</a>
+			<span>/</span>
+			<span class="text-gray-900 dark:text-gray-100">{ fork.ForkFullName }</span>
+		</div>
+		<!-- Fork header -->
+		<div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6">
+			<div class="flex items-start justify-between">
+				<div>
+					<h2 class="text-2xl font-bold tracking-tight">{ fork.ForkFullName }</h2>
+					<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Fork of { repo.FullName }</p>
+				</div>
+				@ForkStatusBadge(fork.AnalysisStatus)
+			</div>
+			<div class="mt-4 grid gap-4 sm:grid-cols-3">
+				@templates.StatCard("Ahead", fmt.Sprintf("+%d commits", fork.AheadBy), "")
+				@templates.StatCard("Behind", fmt.Sprintf("-%d commits", fork.BehindBy), "")
+				if fork.MergeBaseSHA != nil {
+					@templates.StatCard("Merge Base", shortSHA(*fork.MergeBaseSHA), "")
+				} else {
+					@templates.StatCard("Merge Base", "Unknown", "")
+				}
+			</div>
+		</div>
+		<!-- Changes -->
+		<div>
+			<h3 class="text-lg font-semibold mb-4">Classified Changes</h3>
+			if len(changes) == 0 {
+				@templates.EmptyState("No changes found", "This fork has no unique commits compared to the source repository.")
+			} else {
+				<div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
+					<table class="w-full text-sm">
+						<thead>
+							<tr class="border-b border-gray-100 dark:border-gray-800 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+								<th class="px-5 py-3">Commit</th>
+								<th class="px-5 py-3">Type</th>
+								<th class="px-5 py-3">Confidence</th>
+								<th class="px-5 py-3">File</th>
+								<th class="px-5 py-3">Flags</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+							for _, c := range changes {
+								@ForkChangeRow(repoID, c)
+							}
+						</tbody>
+					</table>
+				</div>
+				if nextCursor != "" {
+					@templates.LoadMore(fmt.Sprintf("/fragments/fork-changes/%d/%d?cursor=%s", repoID, fork.ID, nextCursor))
+				}
+			}
+		</div>
+	</div>
+}
+
+templ ForkChangeRows(repoID uint64, forkID uint64, changes []repository.ForkChange, nextCursor string) {
+	for _, c := range changes {
+		@ForkChangeRow(repoID, c)
+	}
+	if nextCursor != "" {
+		@templates.LoadMore(fmt.Sprintf("/fragments/fork-changes/%d/%d?cursor=%s", repoID, forkID, nextCursor))
+	}
+}
+
+templ ForkChangeRow(repoID uint64, c repository.ForkChange) {
+	<tr>
+		<td class="px-5 py-3">
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/repos/%d/commits/%s", repoID, c.CommitSHA)) }
+				class="font-mono text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
+			>
+				{ shortSHA(c.CommitSHA) }
+			</a>
+		</td>
+		<td class="px-5 py-3">
+			@ChangeTypeBadge(c.ChangeType)
+		</td>
+		<td class="px-5 py-3">
+			@ConfidenceIndicator(c.Confidence)
+		</td>
+		<td class="px-5 py-3 font-mono text-xs text-gray-500 dark:text-gray-400 truncate max-w-48">
+			if c.FilePath != nil {
+				{ *c.FilePath }
+			} else {
+				<span class="text-gray-400">—</span>
+			}
+		</td>
+		<td class="px-5 py-3">
+			<div class="flex items-center gap-1.5">
+				if c.IsCherryPick {
+					@templates.Badge("Cherry-pick", "purple")
+				}
+				if c.IsRebase {
+					@templates.Badge("Rebase", "blue")
+				}
+				if c.UpstreamSHA != nil {
+					<span class="text-xs text-gray-400" title={ "Upstream: " + *c.UpstreamSHA }>
+						{ fmt.Sprintf("↑%s", shortSHA(*c.UpstreamSHA)) }
+					</span>
+				}
+			</div>
+		</td>
+	</tr>
+}
+
+templ ChangeTypeBadge(changeType string) {
+	switch changeType {
+		case "feature":
+			@templates.Badge("Feature", "blue")
+		case "bugfix":
+			@templates.Badge("Bugfix", "red")
+		case "refactor":
+			@templates.Badge("Refactor", "purple")
+		case "docs":
+			@templates.Badge("Docs", "green")
+		case "chore":
+			@templates.Badge("Chore", "yellow")
+		default:
+			@templates.Badge("Unknown", "")
+	}
+}
+
+templ ConfidenceIndicator(confidence float64) {
+	<div class="flex items-center gap-2">
+		<div class="w-16 h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+			<div
+				class={ "h-full rounded-full",
+					templ.KV("bg-emerald-500", confidence >= 0.7),
+					templ.KV("bg-amber-500", confidence >= 0.4 && confidence < 0.7),
+					templ.KV("bg-red-400", confidence < 0.4),
+				}
+				style={ fmt.Sprintf("width: %d%%", int(confidence*100)) }
+			></div>
+		</div>
+		<span class="text-xs tabular-nums text-gray-500 dark:text-gray-400">{ fmt.Sprintf("%.0f%%", confidence*100) }</span>
+	</div>
+}

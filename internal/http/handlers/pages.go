@@ -26,6 +26,7 @@ type PageHandler struct {
 	commitRepo    repository.CommitRepository
 	contribRepo   repository.ContributorRepository
 	repoRepo      repository.RepoRepository
+	forkRepo      repository.ForkRepository
 	gitService    gitclient.GitService
 	blameAnalyzer analysis.BlameAnalyzer
 }
@@ -37,6 +38,7 @@ func NewPageHandler(
 	commitRepo repository.CommitRepository,
 	contribRepo repository.ContributorRepository,
 	repoRepo repository.RepoRepository,
+	forkRepo repository.ForkRepository,
 	gitService gitclient.GitService,
 	blameAnalyzer analysis.BlameAnalyzer,
 ) *PageHandler {
@@ -47,6 +49,7 @@ func NewPageHandler(
 		commitRepo:    commitRepo,
 		contribRepo:   contribRepo,
 		repoRepo:      repoRepo,
+		forkRepo:      forkRepo,
 		gitService:    gitService,
 		blameAnalyzer: blameAnalyzer,
 	}
@@ -439,6 +442,195 @@ func (h *PageHandler) BlameView(w http.ResponseWriter, r *http.Request) {
 	} else {
 		analysistemplates.BlameViewPage(pd, repoID, repo, filePath, ref, result).Render(r.Context(), w)
 	}
+}
+
+// --- Forks ---
+
+func (h *PageHandler) ForkList(w http.ResponseWriter, r *http.Request) {
+	u := auth.UserFromContext(r.Context())
+	repoID, err := strconv.ParseUint(chi.URLParam(r, "repoID"), 10, 64)
+	if err != nil {
+		h.Error404(w, r)
+		return
+	}
+
+	repo, err := h.repoService.GetRepo(r.Context(), u.ID, repoID)
+	if err != nil {
+		h.Error404(w, r)
+		return
+	}
+
+	cursorStr := r.URL.Query().Get("cursor")
+	cursor, _ := strconv.ParseUint(cursorStr, 10, 64)
+
+	forks, _ := h.forkRepo.ListBySourceRepo(r.Context(), repoID, cursor, 50)
+
+	var nextCursor string
+	if len(forks) > 50 {
+		nextCursor = fmt.Sprintf("%d", forks[49].ID)
+		forks = forks[:50]
+	}
+
+	pd := h.pageData(r, "Forks — "+repo.FullName, "/repos")
+	html(w)
+	if isHTMX(r) {
+		analysistemplates.ForkListContent(repoID, repo, forks, nextCursor).Render(r.Context(), w)
+	} else {
+		analysistemplates.ForkListPage(pd, repoID, repo, forks, nextCursor).Render(r.Context(), w)
+	}
+}
+
+func (h *PageHandler) ForkChanges(w http.ResponseWriter, r *http.Request) {
+	u := auth.UserFromContext(r.Context())
+	repoID, err := strconv.ParseUint(chi.URLParam(r, "repoID"), 10, 64)
+	if err != nil {
+		h.Error404(w, r)
+		return
+	}
+
+	repo, err := h.repoService.GetRepo(r.Context(), u.ID, repoID)
+	if err != nil {
+		h.Error404(w, r)
+		return
+	}
+
+	forkID, err := strconv.ParseUint(chi.URLParam(r, "forkID"), 10, 64)
+	if err != nil {
+		h.Error404(w, r)
+		return
+	}
+
+	fork, err := h.forkRepo.FindByID(r.Context(), forkID)
+	if err != nil || fork == nil {
+		h.Error404(w, r)
+		return
+	}
+
+	cursorStr := r.URL.Query().Get("cursor")
+	cursor, _ := strconv.ParseUint(cursorStr, 10, 64)
+
+	changes, _ := h.forkRepo.ListForkChanges(r.Context(), forkID, cursor, 50)
+
+	var nextCursor string
+	if len(changes) > 50 {
+		nextCursor = fmt.Sprintf("%d", changes[49].ID)
+		changes = changes[:50]
+	}
+
+	pd := h.pageData(r, fork.ForkFullName+" — Changes", "/repos")
+	html(w)
+	if isHTMX(r) {
+		analysistemplates.ForkChangesContent(repoID, repo, fork, changes, nextCursor).Render(r.Context(), w)
+	} else {
+		analysistemplates.ForkChangesPage(pd, repoID, repo, fork, changes, nextCursor).Render(r.Context(), w)
+	}
+}
+
+func (h *PageHandler) ForkReport(w http.ResponseWriter, r *http.Request) {
+	u := auth.UserFromContext(r.Context())
+	repoID, err := strconv.ParseUint(chi.URLParam(r, "repoID"), 10, 64)
+	if err != nil {
+		h.Error404(w, r)
+		return
+	}
+
+	repo, err := h.repoService.GetRepo(r.Context(), u.ID, repoID)
+	if err != nil {
+		h.Error404(w, r)
+		return
+	}
+
+	forks, _ := h.forkRepo.ListBySourceRepo(r.Context(), repoID, 0, 1000)
+
+	var summaries []analysistemplates.ForkReportSummary
+	for _, f := range forks {
+		changes, _ := h.forkRepo.ListForkChanges(r.Context(), f.ID, 0, 1000)
+		summaries = append(summaries, analysistemplates.ForkReportSummary{
+			Fork:         f,
+			TotalChanges: len(changes),
+		})
+	}
+
+	pd := h.pageData(r, "Fork Report — "+repo.FullName, "/repos")
+	html(w)
+	if isHTMX(r) {
+		analysistemplates.ForkReportContent(repoID, repo, summaries).Render(r.Context(), w)
+	} else {
+		analysistemplates.ForkReportPage(pd, repoID, repo, summaries).Render(r.Context(), w)
+	}
+}
+
+func (h *PageHandler) ForkRowFragment(w http.ResponseWriter, r *http.Request) {
+	repoID, err := strconv.ParseUint(chi.URLParam(r, "repoID"), 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	forkID, err := strconv.ParseUint(chi.URLParam(r, "forkID"), 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	fork, err := h.forkRepo.FindByID(r.Context(), forkID)
+	if err != nil || fork == nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	html(w)
+	analysistemplates.ForkRow(repoID, *fork).Render(r.Context(), w)
+}
+
+func (h *PageHandler) ForkRowsFragment(w http.ResponseWriter, r *http.Request) {
+	repoID, err := strconv.ParseUint(chi.URLParam(r, "repoID"), 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	cursorStr := r.URL.Query().Get("cursor")
+	cursor, _ := strconv.ParseUint(cursorStr, 10, 64)
+
+	forks, _ := h.forkRepo.ListBySourceRepo(r.Context(), repoID, cursor, 50)
+
+	var nextCursor string
+	if len(forks) > 50 {
+		nextCursor = fmt.Sprintf("%d", forks[49].ID)
+		forks = forks[:50]
+	}
+
+	html(w)
+	analysistemplates.ForkRows(repoID, forks, nextCursor).Render(r.Context(), w)
+}
+
+func (h *PageHandler) ForkChangeRowsFragment(w http.ResponseWriter, r *http.Request) {
+	repoID, err := strconv.ParseUint(chi.URLParam(r, "repoID"), 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	forkID, err := strconv.ParseUint(chi.URLParam(r, "forkID"), 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	cursorStr := r.URL.Query().Get("cursor")
+	cursor, _ := strconv.ParseUint(cursorStr, 10, 64)
+
+	changes, _ := h.forkRepo.ListForkChanges(r.Context(), forkID, cursor, 50)
+
+	var nextCursor string
+	if len(changes) > 50 {
+		nextCursor = fmt.Sprintf("%d", changes[49].ID)
+		changes = changes[:50]
+	}
+
+	html(w)
+	analysistemplates.ForkChangeRows(repoID, forkID, changes, nextCursor).Render(r.Context(), w)
 }
 
 // --- Fragments ---

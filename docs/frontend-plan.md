@@ -94,22 +94,26 @@ The frontend is planned in **6 phases**. Each phase we:
 
 ---
 
-## Phase F4: Fork Views
+## Phase F4: Fork Views ✅
 
 **Goal:** Fork listing, analysis trigger, changes, evolution report.
 
-**Files to create:**
-- `internal/analysis/templates/fork_list.templ` — forks table with ahead/behind, status
-- `internal/analysis/templates/fork_changes.templ` — classified changes
-- `internal/analysis/templates/fork_report.templ` — cross-fork summary, similarity clusters
+**Files created:**
+- `internal/analysis/templates/fork_list.templ` — forks table with ahead/behind, status badges, self-polling rows, analyze button
+- `internal/analysis/templates/fork_changes.templ` — classified changes with type badges, confidence bars, cherry-pick/rebase flags
+- `internal/analysis/templates/fork_report.templ` — cross-fork summary with stats, comparison table
 
-**Routes:** fork list, analyze fork, fork changes, fork report
+**Routes added:**
+- `GET /repos/{repoID}/forks` — fork list page
+- `GET /repos/{repoID}/forks/{forkID}/changes` — fork changes detail
+- `GET /repos/{repoID}/fork-report` — fork evolution report
+- `GET /fragments/forks/{repoID}` — fork rows pagination
+- `GET /fragments/fork-row/{repoID}/{forkID}` — single fork row polling
+- `GET /fragments/fork-changes/{repoID}/{forkID}` — fork change rows pagination
 
-**Key interactions:**
-- "Analyze" button → job created → row polls for status
-- Classification badges with confidence scores
-- Cherry-pick/rebase indicators
-- "Create audit" action links to review creation
+**Modified:**
+- `internal/http/handlers/pages.go` — added ForkList, ForkChanges, ForkReport, ForkRowFragment, ForkRowsFragment, ForkChangeRowsFragment; added forkRepo dependency
+- `internal/http/handlers/routes.go` — added fork page routes and fragment endpoints
 
 ---
 

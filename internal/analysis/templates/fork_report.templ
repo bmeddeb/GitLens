@@ -1,0 +1,128 @@
+package analysistemplates
+
+import (
+	"fmt"
+	"github.com/user/gitlens-pro/internal/http/templates"
+	"github.com/user/gitlens-pro/internal/repository"
+)
+
+// ForkReportSummary holds a fork and its total change count for the report view.
+type ForkReportSummary struct {
+	Fork         repository.Fork
+	TotalChanges int
+}
+
+templ ForkReportPage(pd templates.PageData, repoID uint64, repo *repository.Repository, summaries []ForkReportSummary) {
+	@templates.Layout(pd) {
+		@ForkReportContent(repoID, repo, summaries)
+	}
+}
+
+templ ForkReportContent(repoID uint64, repo *repository.Repository, summaries []ForkReportSummary) {
+	<div class="space-y-6">
+		<!-- Breadcrumb -->
+		<div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+			<a href="/repos" class="hover:text-gray-700 dark:hover:text-gray-300">Repositories</a>
+			<span>/</span>
+			<a href={ templ.SafeURL(fmt.Sprintf("/repos/%d", repoID)) } class="hover:text-gray-700 dark:hover:text-gray-300">{ repo.FullName }</a>
+			<span>/</span>
+			<a href={ templ.SafeURL(fmt.Sprintf("/repos/%d/forks", repoID)) } class="hover:text-gray-700 dark:hover:text-gray-300">Forks</a>
+			<span>/</span>
+			<span class="text-gray-900 dark:text-gray-100">Fork Report</span>
+		</div>
+		<div>
+			<h2 class="text-2xl font-bold tracking-tight">Fork Evolution Report</h2>
+			<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Cross-fork summary for { repo.FullName }.</p>
+		</div>
+		<!-- Summary stats -->
+		<div class="grid gap-4 sm:grid-cols-3">
+			@templates.StatCard("Total Forks", fmt.Sprintf("%d", len(summaries)), "")
+			@templates.StatCard("Analyzed", fmt.Sprintf("%d", countAnalyzed(summaries)), "")
+			@templates.StatCard("Total Unique Changes", fmt.Sprintf("%d", totalChanges(summaries)), "")
+		</div>
+		if len(summaries) == 0 {
+			@templates.EmptyState("No fork data", "No forks have been analyzed yet. Go to the forks list to trigger analysis.")
+		} else {
+			<!-- Fork comparison table -->
+			<div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
+				<table class="w-full text-sm">
+					<thead>
+						<tr class="border-b border-gray-100 dark:border-gray-800 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+							<th class="px-5 py-3">Fork</th>
+							<th class="px-5 py-3">Status</th>
+							<th class="px-5 py-3 text-right">Ahead</th>
+							<th class="px-5 py-3 text-right">Behind</th>
+							<th class="px-5 py-3 text-right">Unique Changes</th>
+							<th class="px-5 py-3">Diverged</th>
+							<th class="px-5 py-3"></th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+						for _, s := range summaries {
+							<tr>
+								<td class="px-5 py-3">
+									<p class="font-medium">{ s.Fork.ForkFullName }</p>
+								</td>
+								<td class="px-5 py-3">
+									@ForkStatusBadge(s.Fork.AnalysisStatus)
+								</td>
+								<td class="px-5 py-3 text-right tabular-nums">
+									if s.Fork.AheadBy > 0 {
+										<span class="text-emerald-600 dark:text-emerald-400 font-medium">{ fmt.Sprintf("+%d", s.Fork.AheadBy) }</span>
+									} else {
+										<span class="text-gray-400">0</span>
+									}
+								</td>
+								<td class="px-5 py-3 text-right tabular-nums">
+									if s.Fork.BehindBy > 0 {
+										<span class="text-red-500 dark:text-red-400 font-medium">{ fmt.Sprintf("-%d", s.Fork.BehindBy) }</span>
+									} else {
+										<span class="text-gray-400">0</span>
+									}
+								</td>
+								<td class="px-5 py-3 text-right tabular-nums font-medium">
+									{ fmt.Sprintf("%d", s.TotalChanges) }
+								</td>
+								<td class="px-5 py-3 text-xs text-gray-500 dark:text-gray-400">
+									if s.Fork.DivergedAt != nil {
+										{ s.Fork.DivergedAt.Format("Jan 2, 2006") }
+									} else {
+										<span class="text-gray-400">—</span>
+									}
+								</td>
+								<td class="px-5 py-3 text-right">
+									if s.Fork.AnalysisStatus == "complete" {
+										<a
+											href={ templ.SafeURL(fmt.Sprintf("/repos/%d/forks/%d/changes", repoID, s.Fork.ID)) }
+											class="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium"
+										>
+											View Changes
+										</a>
+									}
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
+}
+
+func countAnalyzed(summaries []ForkReportSummary) int {
+	count := 0
+	for _, s := range summaries {
+		if s.Fork.AnalysisStatus == "complete" {
+			count++
+		}
+	}
+	return count
+}
+
+func totalChanges(summaries []ForkReportSummary) int {
+	total := 0
+	for _, s := range summaries {
+		total += s.TotalChanges
+	}
+	return total
+}

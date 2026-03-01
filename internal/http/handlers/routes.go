@@ -66,6 +66,11 @@ func RegisterRoutes(p RouteParams) {
 		r.Get("/repos/{repoID}/contributors", p.Pages.ContributorList)
 		r.Get("/repos/{repoID}/blame", p.Pages.BlameView)
 
+		// Forks
+		r.Get("/repos/{repoID}/forks", p.Pages.ForkList)
+		r.Get("/repos/{repoID}/forks/{forkID}/changes", p.Pages.ForkChanges)
+		r.Get("/repos/{repoID}/fork-report", p.Pages.ForkReport)
+
 		// HTMX fragments
 		r.Get("/fragments/notification-count", p.Pages.NotificationBadgeFragment)
 		r.Get("/fragments/repo-add-form", p.Pages.RepoAddForm)
@@ -74,6 +79,9 @@ func RegisterRoutes(p RouteParams) {
 		r.Get("/fragments/job-rows", p.Pages.JobRowsFragment)
 		r.Get("/fragments/commits/{repoID}", p.Pages.CommitRowsFragment)
 		r.Get("/fragments/contributors/{repoID}", p.Pages.ContributorRowsFragment)
+		r.Get("/fragments/forks/{repoID}", p.Pages.ForkRowsFragment)
+		r.Get("/fragments/fork-row/{repoID}/{forkID}", p.Pages.ForkRowFragment)
+		r.Get("/fragments/fork-changes/{repoID}/{forkID}", p.Pages.ForkChangeRowsFragment)
 	})
 
 	// Protected API routes
