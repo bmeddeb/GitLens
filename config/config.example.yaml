@@ -1,0 +1,61 @@
+# GitLens Pro Configuration
+# Copy to config.yaml and edit values.
+# Secrets MUST be set via environment variables (GITLENS_ prefix), not this file.
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  base_url: "http://localhost:8080"
+  read_timeout: 30s
+  write_timeout: 30s
+  shutdown_timeout: 30s
+
+database:
+  host: "localhost"
+  port: 3306
+  user: "gitlens"
+  # password: set via GITLENS_DATABASE_PASSWORD env var
+  name: "gitlens"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 5m
+  migrations_path: "migrations"
+
+github:
+  # client_id: set via GITLENS_GITHUB_CLIENT_ID env var
+  # client_secret: set via GITLENS_GITHUB_CLIENT_SECRET env var
+  scopes:
+    - "read:user"
+    - "user:email"
+    - "repo"
+
+# encryption_key: set via GITLENS_ENCRYPTION_KEY env var (32-byte hex)
+
+storage:
+  repos_path: "storage/repos"
+  forks_path: "storage/forks"
+
+jobs:
+  worker_count: 3
+  poll_interval: 5s
+  stale_running_timeout: 30m
+
+access:
+  rate_limit_per_min: 100
+  session_duration: 720h
+  revalidation_stale_after: 1h
+
+email:
+  provider: "smtp"
+  from: "GitLens Pro <notifications@gitlens.example.com>"
+  smtp:
+    host: "localhost"
+    port: 1025
+    starttls: false
+  # ses:
+  #   region: "us-east-1"
+  digest_cron: "0 8 * * *"
+
+log:
+  level: "info"
+  encoding: "json"

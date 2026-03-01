@@ -1,0 +1,50 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+  base_url: "http://localhost:8080"
+  read_timeout: 30s
+  write_timeout: 30s
+  shutdown_timeout: 30s
+
+database:
+  host: "localhost"
+  port: 3306
+  user: "gitlens"
+  name: "gitlens"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 5m
+  migrations_path: "migrations"
+
+github:
+  scopes:
+    - "read:user"
+    - "user:email"
+    - "repo"
+
+storage:
+  repos_path: "storage/repos"
+  forks_path: "storage/forks"
+
+jobs:
+  worker_count: 3
+  poll_interval: 5s
+  stale_running_timeout: 30m
+
+access:
+  rate_limit_per_min: 100
+  session_duration: 720h
+  revalidation_stale_after: 1h
+
+email:
+  provider: "smtp"
+  from: "GitLens Pro <notifications@gitlens.example.com>"
+  smtp:
+    host: "localhost"
+    port: 1025
+    starttls: false
+  digest_cron: "0 8 * * *"
+
+log:
+  level: "info"
+  encoding: "json"

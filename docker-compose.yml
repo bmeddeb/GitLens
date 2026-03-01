@@ -1,0 +1,71 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      GITLENS_DATABASE_HOST: mysql
+      GITLENS_DATABASE_PORT: "3306"
+      GITLENS_DATABASE_USER: gitlens
+      GITLENS_DATABASE_PASSWORD: ${GITLENS_DATABASE_PASSWORD:-gitlens_secret}
+      GITLENS_DATABASE_NAME: gitlens
+      GITLENS_GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITLENS_GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      GITLENS_ENCRYPTION_KEY: ${ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef}
+      GITLENS_SERVER_BASE_URL: ${GITLENS_SERVER_BASE_URL:-http://localhost:8080}
+      GITLENS_EMAIL_SMTP_HOST: mailhog
+      GITLENS_EMAIL_SMTP_PORT: "1025"
+    volumes:
+      - repo-storage:/app/storage/repos
+      - fork-storage:/app/storage/forks
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root_secret
+      MYSQL_DATABASE: gitlens
+      MYSQL_USER: gitlens
+      MYSQL_PASSWORD: ${GITLENS_DATABASE_PASSWORD:-gitlens_secret}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    command: >
+      --default-authentication-plugin=caching_sha2_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_secret"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - app
+    profiles:
+      - tls
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  mysql-data:
+  repo-storage:
+  fork-storage:
+  caddy-data:

@@ -106,7 +106,7 @@ type LogConfig struct {
 
 func Load() (*AppConfig, error) {
 	if f, err := os.Open(".env"); err == nil {
-		_ = gotenv.Apply(f)
+		_ = gotenv.OverApply(f)
 		f.Close()
 	}
 
@@ -120,6 +120,13 @@ func Load() (*AppConfig, error) {
 	v.SetEnvPrefix("GITLENS")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
+
+	// Secrets-only keys (no yaml/default); must be explicitly bound so
+	// Viper's AutomaticEnv resolves them during Unmarshal.
+	v.BindEnv("github.client_id")
+	v.BindEnv("github.client_secret")
+	v.BindEnv("encryption.key")
+	v.BindEnv("database.password")
 
 	// Defaults
 	v.SetDefault("server.host", "0.0.0.0")
