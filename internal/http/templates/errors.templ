@@ -1,0 +1,61 @@
+package templates
+
+templ Error404() {
+	@LayoutAnon("Not Found") {
+		<div class="flex min-h-full items-center justify-center px-6 py-24">
+			<div class="text-center">
+				<p class="text-7xl font-bold text-indigo-600">404</p>
+				<h1 class="mt-4 text-2xl font-semibold">Page not found</h1>
+				<p class="mt-2 text-gray-500 dark:text-gray-400">Sorry, we couldn't find the page you're looking for.</p>
+				<div class="mt-8">
+					<a href="/" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 transition-colors">
+						<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"></path>
+						</svg>
+						Back to dashboard
+					</a>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+templ Error403() {
+	@LayoutAnon("Access Denied") {
+		<div class="flex min-h-full items-center justify-center px-6 py-24">
+			<div class="text-center">
+				<p class="text-7xl font-bold text-amber-500">403</p>
+				<h1 class="mt-4 text-2xl font-semibold">Access denied</h1>
+				<p class="mt-2 text-gray-500 dark:text-gray-400">You don't have permission to access this resource.</p>
+				<div class="mt-8">
+					<a href="/" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 transition-colors">
+						<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"></path>
+						</svg>
+						Back to dashboard
+					</a>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+templ Error500() {
+	@LayoutAnon("Server Error") {
+		<div class="flex min-h-full items-center justify-center px-6 py-24">
+			<div class="text-center">
+				<p class="text-7xl font-bold text-red-500">500</p>
+				<h1 class="mt-4 text-2xl font-semibold">Something went wrong</h1>
+				<p class="mt-2 text-gray-500 dark:text-gray-400">An unexpected error occurred. Please try again later.</p>
+				<div class="mt-8">
+					<a href="/" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 transition-colors">
+						<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"></path>
+						</svg>
+						Back to dashboard
+					</a>
+				</div>
+			</div>
+		</div>
+	}
+}

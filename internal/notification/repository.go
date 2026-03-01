@@ -16,6 +16,7 @@ type Repository interface {
 	FindByID(ctx context.Context, id uint64) (*Notification, error)
 	Update(ctx context.Context, n *Notification) error
 	ListByUser(ctx context.Context, userID uint64, cursor uint64, limit int) ([]Notification, error)
+	CountUnread(ctx context.Context, userID uint64) (int64, error)
 	MarkRead(ctx context.Context, id, userID uint64) error
 	MarkAllRead(ctx context.Context, userID uint64) error
 	ListPendingEmails(ctx context.Context, limit int) ([]Notification, error)
@@ -70,6 +71,14 @@ func (r *repository) ListByUser(ctx context.Context, userID uint64, cursor uint6
 		return nil, err
 	}
 	return notifications, nil
+}
+
+func (r *repository) CountUnread(ctx context.Context, userID uint64) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&Notification{}).
+		Where("user_id = ? AND is_read = ?", userID, false).
+		Count(&count).Error
+	return count, err
 }
 
 func (r *repository) MarkRead(ctx context.Context, id, userID uint64) error {

@@ -1,0 +1,112 @@
+package templates
+
+import "github.com/user/gitlens-pro/internal/user"
+
+type PageData struct {
+	Title       string
+	User        *user.User
+	CurrentPath string
+	UnreadCount int
+}
+
+templ Layout(data PageData) {
+	<!DOCTYPE html>
+	<html lang="en" class="h-full">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ data.Title } — GitLens Pro</title>
+			<link rel="icon" href="/static/favicon.svg" type="image/svg+xml"/>
+			<script src="https://cdn.tailwindcss.com"></script>
+			<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+			<script>
+				tailwind.config = {
+					darkMode: 'class',
+					theme: {
+						extend: {
+							colors: {
+								surface: {
+									DEFAULT: '#ffffff',
+									dark: '#0a0a0a',
+								},
+							},
+						},
+					},
+				};
+			</script>
+			<script>
+				(function() {
+					var theme = document.cookie.match(/theme=(\w+)/);
+					theme = theme ? theme[1] : null;
+					if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+						document.documentElement.classList.add('dark');
+					}
+				})();
+			</script>
+			<style>
+				[x-cloak] { display: none !important; }
+			</style>
+		</head>
+		<body class="h-full bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 antialiased" hx-boost="true">
+			@Nav(data)
+			<div class="flex h-full flex-col">
+				@Header(data)
+				<main class="flex-1 overflow-y-auto p-6 lg:p-8" id="main-content">
+					{ children... }
+				</main>
+			</div>
+			<!-- Modal container -->
+			<div id="modal" class="relative z-50"></div>
+			<!-- Toast container -->
+			<div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+			<!-- Sidebar backdrop -->
+			<div id="sidebar-backdrop" class="fixed inset-0 bg-black/50 z-30 hidden" onclick="closeSidebar()"></div>
+			<script>
+				function openSidebar() {
+					document.getElementById('sidebar').classList.remove('-translate-x-full');
+					document.getElementById('sidebar-backdrop').classList.remove('hidden');
+				}
+
+				function closeSidebar() {
+					document.getElementById('sidebar').classList.add('-translate-x-full');
+					document.getElementById('sidebar-backdrop').classList.add('hidden');
+				}
+
+				function toggleTheme() {
+					var html = document.documentElement;
+					var isDark = html.classList.toggle('dark');
+					document.cookie = 'theme=' + (isDark ? 'dark' : 'light') + ';path=/;max-age=31536000;SameSite=Lax';
+				}
+			</script>
+		</body>
+	</html>
+}
+
+templ LayoutAnon(title string) {
+	<!DOCTYPE html>
+	<html lang="en" class="h-full">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ title } — GitLens Pro</title>
+			<link rel="icon" href="/static/favicon.svg" type="image/svg+xml"/>
+			<script src="https://cdn.tailwindcss.com"></script>
+			<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+			<script>
+				tailwind.config = { darkMode: 'class' };
+			</script>
+			<script>
+				(function() {
+					var theme = document.cookie.match(/theme=(\w+)/);
+					theme = theme ? theme[1] : null;
+					if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+						document.documentElement.classList.add('dark');
+					}
+				})();
+			</script>
+		</head>
+		<body class="h-full bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 antialiased">
+			{ children... }
+		</body>
+	</html>
+}

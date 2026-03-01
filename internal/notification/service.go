@@ -11,6 +11,7 @@ type Service interface {
 	Notify(ctx context.Context, n *Notification) error
 	NotifyReviewEvent(ctx context.Context, eventType string, reviewID uint64, actorID uint64, title, bodyPreview string) error
 	List(ctx context.Context, userID uint64, cursor uint64, limit int) ([]Notification, error)
+	CountUnread(ctx context.Context, userID uint64) (int64, error)
 	MarkRead(ctx context.Context, id, userID uint64) error
 	MarkAllRead(ctx context.Context, userID uint64) error
 }
@@ -43,6 +44,10 @@ func (s *service) NotifyReviewEvent(ctx context.Context, eventType string, revie
 
 func (s *service) List(ctx context.Context, userID uint64, cursor uint64, limit int) ([]Notification, error) {
 	return s.repo.ListByUser(ctx, userID, cursor, limit)
+}
+
+func (s *service) CountUnread(ctx context.Context, userID uint64) (int64, error) {
+	return s.repo.CountUnread(ctx, userID)
 }
 
 func (s *service) MarkRead(ctx context.Context, id, userID uint64) error {

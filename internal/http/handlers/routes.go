@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/user/gitlens-pro/internal/auth"
 	"go.uber.org/fx"
@@ -12,6 +14,7 @@ type RouteParams struct {
 	Router            *chi.Mux
 	AuthHandler       *auth.OAuthHandler
 	SessionMiddleware *auth.SessionMiddleware
+	Pages             *PageHandler
 	Health            *HealthHandler
 	User              *UserHandler
 	Job               *JobHandler
@@ -28,6 +31,10 @@ type RouteParams struct {
 func RegisterRoutes(p RouteParams) {
 	r := p.Router
 
+	// Static files
+	fileServer := http.FileServer(http.Dir("static"))
+	r.Handle("/static/*", http.StripPrefix("/static/", fileServer))
+
 	// Public routes
 	r.Get("/healthz", p.Health.Healthz)
 	r.Get("/readyz", p.Health.Readyz)
@@ -36,7 +43,18 @@ func RegisterRoutes(p RouteParams) {
 	r.Get("/auth/github/login", p.AuthHandler.Login)
 	r.Get("/auth/github/callback", p.AuthHandler.Callback)
 
-	// Protected routes
+	// Public page routes
+	r.Get("/login", p.Pages.Login)
+
+	// Protected page routes (redirect to /login on auth failure)
+	r.Group(func(r chi.Router) {
+		r.Use(p.SessionMiddleware.RequireAuthPage)
+
+		r.Get("/", p.Pages.Dashboard)
+		r.Get("/fragments/notification-count", p.Pages.NotificationBadgeFragment)
+	})
+
+	// Protected API routes
 	r.Group(func(r chi.Router) {
 		r.Use(p.SessionMiddleware.RequireAuth)
 
