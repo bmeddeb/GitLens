@@ -48,49 +48,49 @@ The frontend is planned in **6 phases**. Each phase we:
 
 ---
 
-## Phase F2: Repository Views
+## Phase F2: Repository Views ✅
 
 **Goal:** Repo list, add repo, repo detail, sync/clone status, jobs list.
 
-**Files to create:**
+**Files created:**
 - `internal/repository/templates/repo_list.templ` — paginated card grid with status badges
 - `internal/repository/templates/repo_detail.templ` — repo overview, stats, actions
-- `internal/repository/templates/repo_add_modal.templ` — add repo dialog
+- `internal/repository/templates/repo_add.templ` — add repo form, success/error fragments
 - `internal/jobs/templates/job_list.templ` — job table with progress
 - `internal/jobs/templates/job_row.templ` — HTMX-swappable row for live updates
 
 **Routes:** repo list, repo detail, add repo, sync, remove, recheck access, jobs
 
-**Key interactions:**
-- Add repo → HTMX form → shows job progress card with polling
-- Clone/sync status badges auto-refresh via `hx-trigger="every 5s"` while in-progress
-- Cursor pagination with "Load more" button
-
 ---
 
-## Phase F3: Commit & Analysis Views
+## Phase F3: Commit & Analysis Views ✅
 
 **Goal:** Commit log, commit detail + diff rendering (unified + side-by-side), blame, contributors.
 
-**Files to create:**
-- `internal/analysis/templates/commit_list.templ` — filterable commit log
-- `internal/analysis/templates/commit_detail.templ` — commit metadata + diff
+**Files created:**
+- `internal/analysis/templates/commit_list.templ` — commit log with pagination (package `analysistemplates`)
+- `internal/analysis/templates/commit_detail.templ` — commit metadata + diff rendering
 - `internal/analysis/templates/contributor_list.templ` — contributor stats table
 - `internal/analysis/templates/blame_view.templ` — line-by-line blame
-- `internal/http/templates/diff/diff_file_unified.templ` — single-column diff + Chroma
-- `internal/http/templates/diff/diff_file_side_by_side.templ` — two-column diff
-- `internal/http/templates/diff/diff_hunk.templ` — hunk header + lines
-- `internal/http/templates/diff/diff_line.templ` — line with stable anchor ID
-- `internal/http/templates/diff/diff_file_header.templ` — collapsible file header
-- `internal/http/templates/diff/diff_view_toggle.templ` — unified/side-by-side switcher
+- `internal/http/templates/diff/diff.templ` — unified diff components (DiffView, DiffFile, DiffFileHeader, DiffViewToggle, split/unified rendering, stable anchor IDs per ADR-002)
 
-**Routes:** commit list, commit detail, commit diff, contributors, blame
+**Routes added:**
+- `GET /repos/{repoID}/commits` — commit list page
+- `GET /repos/{repoID}/commits/{sha}` — commit detail with diff
+- `GET /repos/{repoID}/contributors` — contributor stats
+- `GET /repos/{repoID}/blame?path=&ref=` — blame view
+- `GET /fragments/commits/{repoID}` — commit rows pagination fragment
+- `GET /fragments/contributors/{repoID}` — contributor rows pagination fragment
+
+**Modified:**
+- `internal/http/handlers/pages.go` — added CommitList, CommitDetail, CommitRowsFragment, ContributorList, ContributorRowsFragment, BlameView handlers; extended PageHandler with commitRepo, contribRepo, repoRepo, gitService, blameAnalyzer
+- `internal/http/handlers/routes.go` — added page routes and fragment endpoints
 
 **Key design:**
-- Diff view toggle is server round-trip (`hx-get` with `?view=` param)
-- Files > 20 collapsed, lazy-expanded via HTMX
-- Chroma tokenization server-side, CSS classes for theme-aware highlighting
+- Diff view toggle via `hx-get` with `?view=` param (unified/split)
+- Side-by-side pairing: deletes and adds matched in order, context lines on both sides
 - Stable anchor IDs: `F{file_idx}-H{hunk_idx}-{L|R}{line_num}` (per ADR-002)
+- Collapsible file headers via JS toggle
 
 ---
 

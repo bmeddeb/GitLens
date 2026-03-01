@@ -1,0 +1,79 @@
+package analysistemplates
+
+import (
+	"fmt"
+	"github.com/user/gitlens-pro/internal/gitclient"
+	"github.com/user/gitlens-pro/internal/http/templates"
+	"github.com/user/gitlens-pro/internal/repository"
+)
+
+templ BlameViewPage(pd templates.PageData, repoID uint64, repo *repository.Repository, filePath string, ref string, result *gitclient.BlameResult) {
+	@templates.Layout(pd) {
+		@BlameViewContent(repoID, repo, filePath, ref, result)
+	}
+}
+
+templ BlameViewContent(repoID uint64, repo *repository.Repository, filePath string, ref string, result *gitclient.BlameResult) {
+	<div class="space-y-6">
+		<!-- Breadcrumb -->
+		<div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+			<a href="/repos" class="hover:text-gray-700 dark:hover:text-gray-300">Repositories</a>
+			<span>/</span>
+			<a href={ templ.SafeURL(fmt.Sprintf("/repos/%d", repoID)) } class="hover:text-gray-700 dark:hover:text-gray-300">{ repo.FullName }</a>
+			<span>/</span>
+			<span class="text-gray-900 dark:text-gray-100">Blame</span>
+		</div>
+		<div>
+			<h2 class="text-2xl font-bold tracking-tight font-mono text-lg">{ filePath }</h2>
+			<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+				Blame view
+				if ref != "" && ref != "HEAD" {
+					<span> at <code class="font-mono text-xs bg-gray-100 dark:bg-gray-800 rounded px-1.5 py-0.5">{ shortSHA(ref) }</code></span>
+				}
+			</p>
+		</div>
+		if result == nil || len(result.Lines) == 0 {
+			@templates.EmptyState("No blame data", "Unable to compute blame for this file.")
+		} else {
+			<div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
+				<div class="overflow-x-auto">
+					<table class="w-full text-xs font-mono leading-5">
+						for i, line := range result.Lines {
+							<tr class={ "hover:bg-gray-50 dark:hover:bg-gray-800/50",
+								templ.KV("border-t border-gray-100 dark:border-gray-800", i > 0 && result.Lines[i-1].SHA != line.SHA),
+							}>
+								<!-- Blame info -->
+								<td class="px-3 py-0 text-right whitespace-nowrap text-gray-400 dark:text-gray-600 select-none w-24">
+									if i == 0 || result.Lines[i-1].SHA != line.SHA {
+										<a
+											href={ templ.SafeURL(fmt.Sprintf("/repos/%d/commits/%s", repoID, line.SHA)) }
+											class="text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300"
+										>
+											{ shortSHA(line.SHA) }
+										</a>
+									}
+								</td>
+								<td class="px-2 py-0 whitespace-nowrap text-gray-400 dark:text-gray-500 select-none w-28 truncate max-w-28">
+									if i == 0 || result.Lines[i-1].SHA != line.SHA {
+										{ line.AuthorName }
+									}
+								</td>
+								<td class="px-2 py-0 whitespace-nowrap text-gray-400 dark:text-gray-600 select-none w-20">
+									if i == 0 || result.Lines[i-1].SHA != line.SHA {
+										{ line.Date.Format("Jan 02") }
+									}
+								</td>
+								<!-- Line number -->
+								<td class="px-2 py-0 text-right text-gray-400 dark:text-gray-600 select-none border-l border-r border-gray-100 dark:border-gray-800 w-12">
+									{ fmt.Sprintf("%d", line.LineNo) }
+								</td>
+								<!-- Content -->
+								<td class="px-4 py-0 whitespace-pre">{ line.Content }</td>
+							</tr>
+						}
+					</table>
+				</div>
+			</div>
+		}
+	</div>
+}

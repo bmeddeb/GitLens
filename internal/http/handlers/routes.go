@@ -51,7 +51,29 @@ func RegisterRoutes(p RouteParams) {
 		r.Use(p.SessionMiddleware.RequireAuthPage)
 
 		r.Get("/", p.Pages.Dashboard)
+
+		// Repos
+		r.Get("/repos", p.Pages.RepoList)
+		r.Get("/repos/{repoID}", p.Pages.RepoDetail)
+		r.Post("/repos", p.Pages.RepoAdd)
+
+		// Jobs
+		r.Get("/jobs", p.Pages.JobList)
+
+		// Commits & Analysis
+		r.Get("/repos/{repoID}/commits", p.Pages.CommitList)
+		r.Get("/repos/{repoID}/commits/{sha}", p.Pages.CommitDetail)
+		r.Get("/repos/{repoID}/contributors", p.Pages.ContributorList)
+		r.Get("/repos/{repoID}/blame", p.Pages.BlameView)
+
+		// HTMX fragments
 		r.Get("/fragments/notification-count", p.Pages.NotificationBadgeFragment)
+		r.Get("/fragments/repo-add-form", p.Pages.RepoAddForm)
+		r.Get("/fragments/repo-cards", p.Pages.RepoCardsFragment)
+		r.Get("/fragments/job-row/{jobID}", p.Pages.JobRowFragment)
+		r.Get("/fragments/job-rows", p.Pages.JobRowsFragment)
+		r.Get("/fragments/commits/{repoID}", p.Pages.CommitRowsFragment)
+		r.Get("/fragments/contributors/{repoID}", p.Pages.ContributorRowsFragment)
 	})
 
 	// Protected API routes

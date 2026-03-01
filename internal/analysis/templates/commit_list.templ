@@ -1,0 +1,108 @@
+package analysistemplates
+
+import (
+	"fmt"
+	"github.com/user/gitlens-pro/internal/http/templates"
+	"github.com/user/gitlens-pro/internal/repository"
+)
+
+templ CommitListPage(pd templates.PageData, repoID uint64, repo *repository.Repository, commits []repository.Commit, nextCursor string) {
+	@templates.Layout(pd) {
+		@CommitListContent(repoID, repo, commits, nextCursor)
+	}
+}
+
+templ CommitListContent(repoID uint64, repo *repository.Repository, commits []repository.Commit, nextCursor string) {
+	<div class="space-y-6">
+		<!-- Breadcrumb -->
+		<div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+			<a href="/repos" class="hover:text-gray-700 dark:hover:text-gray-300">Repositories</a>
+			<span>/</span>
+			<a href={ templ.SafeURL(fmt.Sprintf("/repos/%d", repoID)) } class="hover:text-gray-700 dark:hover:text-gray-300">{ repo.FullName }</a>
+			<span>/</span>
+			<span class="text-gray-900 dark:text-gray-100">Commits</span>
+		</div>
+		<div>
+			<h2 class="text-2xl font-bold tracking-tight">Commits</h2>
+			<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Commit history for { repo.FullName }.</p>
+		</div>
+		if len(commits) == 0 {
+			@templates.EmptyState("No commits yet", "Commits appear after the repository is cloned and synced.")
+		} else {
+			<div class="space-y-2" id="commit-list">
+				for _, c := range commits {
+					@CommitRow(repoID, c)
+				}
+			</div>
+			if nextCursor != "" {
+				@templates.LoadMore(fmt.Sprintf("/fragments/commits/%d?cursor=%s", repoID, nextCursor))
+			}
+		}
+	</div>
+}
+
+templ CommitRows(repoID uint64, commits []repository.Commit, nextCursor string) {
+	for _, c := range commits {
+		@CommitRow(repoID, c)
+	}
+	if nextCursor != "" {
+		@templates.LoadMore(fmt.Sprintf("/fragments/commits/%d?cursor=%s", repoID, nextCursor))
+	}
+}
+
+templ CommitRow(repoID uint64, c repository.Commit) {
+	<a
+		href={ templ.SafeURL(fmt.Sprintf("/repos/%d/commits/%s", repoID, c.SHA)) }
+		class="block rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-4 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
+	>
+		<div class="flex items-start justify-between gap-4">
+			<div class="min-w-0 flex-1">
+				<p class="text-sm font-medium truncate">{ commitMessage(c) }</p>
+				<div class="mt-1 flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+					<span>{ derefStr(c.AuthorName, "Unknown") }</span>
+					<span>{ c.CommittedAt.Format("Jan 2, 2006 15:04") }</span>
+				</div>
+			</div>
+			<div class="flex items-center gap-3 shrink-0">
+				if c.FilesChanged != nil {
+					<span class="text-xs text-gray-400">{ fmt.Sprintf("%d files", *c.FilesChanged) }</span>
+				}
+				if c.Insertions != nil && *c.Insertions > 0 {
+					<span class="text-xs text-emerald-600 dark:text-emerald-400">{ fmt.Sprintf("+%d", *c.Insertions) }</span>
+				}
+				if c.Deletions != nil && *c.Deletions > 0 {
+					<span class="text-xs text-red-500 dark:text-red-400">{ fmt.Sprintf("-%d", *c.Deletions) }</span>
+				}
+				<code class="font-mono text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 rounded px-1.5 py-0.5">{ shortSHA(c.SHA) }</code>
+			</div>
+		</div>
+	</a>
+}
+
+func commitMessage(c repository.Commit) string {
+	if c.Message == nil {
+		return "(no message)"
+	}
+	msg := *c.Message
+	// First line only
+	for i, ch := range msg {
+		if ch == '\n' {
+			return msg[:i]
+		}
+	}
+	return msg
+}
+
+func shortSHA(sha string) string {
+	if len(sha) > 7 {
+		return sha[:7]
+	}
+	return sha
+}
+
+func derefStr(s *string, fallback string) string {
+	if s == nil {
+		return fallback
+	}
+	return *s
+}

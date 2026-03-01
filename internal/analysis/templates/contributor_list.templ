@@ -1,0 +1,112 @@
+package analysistemplates
+
+import (
+	"fmt"
+	"github.com/user/gitlens-pro/internal/http/templates"
+	"github.com/user/gitlens-pro/internal/repository"
+)
+
+templ ContributorListPage(pd templates.PageData, repoID uint64, repo *repository.Repository, stats []repository.ContributorStat, nextCursor string) {
+	@templates.Layout(pd) {
+		@ContributorListContent(repoID, repo, stats, nextCursor)
+	}
+}
+
+templ ContributorListContent(repoID uint64, repo *repository.Repository, stats []repository.ContributorStat, nextCursor string) {
+	<div class="space-y-6">
+		<!-- Breadcrumb -->
+		<div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+			<a href="/repos" class="hover:text-gray-700 dark:hover:text-gray-300">Repositories</a>
+			<span>/</span>
+			<a href={ templ.SafeURL(fmt.Sprintf("/repos/%d", repoID)) } class="hover:text-gray-700 dark:hover:text-gray-300">{ repo.FullName }</a>
+			<span>/</span>
+			<span class="text-gray-900 dark:text-gray-100">Contributors</span>
+		</div>
+		<div>
+			<h2 class="text-2xl font-bold tracking-tight">Contributors</h2>
+			<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Contribution statistics for { repo.FullName }.</p>
+		</div>
+		if len(stats) == 0 {
+			@templates.EmptyState("No contributors found", "Contributors appear after the repository is synced.")
+		} else {
+			<div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
+				<table class="w-full text-sm">
+					<thead>
+						<tr class="border-b border-gray-100 dark:border-gray-800 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+							<th class="px-5 py-3">Contributor</th>
+							<th class="px-5 py-3 text-right">Commits</th>
+							<th class="px-5 py-3 text-right">Insertions</th>
+							<th class="px-5 py-3 text-right">Deletions</th>
+							<th class="px-5 py-3">First Commit</th>
+							<th class="px-5 py-3">Last Commit</th>
+						</tr>
+					</thead>
+					<tbody id="contributor-table-body" class="divide-y divide-gray-100 dark:divide-gray-800">
+						for _, s := range stats {
+							@ContributorRow(s)
+						}
+					</tbody>
+				</table>
+			</div>
+			if nextCursor != "" {
+				@templates.LoadMore(fmt.Sprintf("/fragments/contributors/%d?cursor=%s", repoID, nextCursor))
+			}
+		}
+	</div>
+}
+
+templ ContributorRows(repoID uint64, stats []repository.ContributorStat, nextCursor string) {
+	for _, s := range stats {
+		@ContributorRow(s)
+	}
+	if nextCursor != "" {
+		@templates.LoadMore(fmt.Sprintf("/fragments/contributors/%d?cursor=%s", repoID, nextCursor))
+	}
+}
+
+templ ContributorRow(s repository.ContributorStat) {
+	<tr>
+		<td class="px-5 py-3">
+			<div class="flex items-center gap-3">
+				<div class="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-sm font-bold text-indigo-700 dark:text-indigo-400 shrink-0">
+					{ initial(contributorName(s)) }
+				</div>
+				<div>
+					<p class="font-medium">{ contributorName(s) }</p>
+					if s.Identity != nil {
+						<p class="text-xs text-gray-400 dark:text-gray-500">{ s.Identity.CanonicalEmail }</p>
+					}
+				</div>
+			</div>
+		</td>
+		<td class="px-5 py-3 text-right tabular-nums font-medium">
+			{ fmt.Sprintf("%d", s.CommitsCount) }
+		</td>
+		<td class="px-5 py-3 text-right tabular-nums text-emerald-600 dark:text-emerald-400">
+			{ fmt.Sprintf("+%d", s.Insertions) }
+		</td>
+		<td class="px-5 py-3 text-right tabular-nums text-red-500 dark:text-red-400">
+			{ fmt.Sprintf("-%d", s.Deletions) }
+		</td>
+		<td class="px-5 py-3 text-xs text-gray-500 dark:text-gray-400">
+			if s.FirstCommitAt != nil {
+				{ s.FirstCommitAt.Format("Jan 2, 2006") }
+			}
+		</td>
+		<td class="px-5 py-3 text-xs text-gray-500 dark:text-gray-400">
+			if s.LastCommitAt != nil {
+				{ s.LastCommitAt.Format("Jan 2, 2006") }
+			}
+		</td>
+	</tr>
+}
+
+func contributorName(s repository.ContributorStat) string {
+	if s.Identity != nil && s.Identity.DisplayName != nil {
+		return *s.Identity.DisplayName
+	}
+	if s.Identity != nil {
+		return s.Identity.CanonicalEmail
+	}
+	return "Unknown"
+}

@@ -1,0 +1,365 @@
+package diff
+
+import (
+	"fmt"
+	"github.com/user/gitlens-pro/internal/gitclient"
+	"path/filepath"
+	"strings"
+)
+
+// DiffView renders the full diff with file list and hunks.
+templ DiffView(result *gitclient.DiffResult, view string) {
+	if result == nil || len(result.Files) == 0 {
+		<div class="text-center py-8 text-sm text-gray-500 dark:text-gray-400">No changes</div>
+	} else {
+		<!-- View toggle -->
+		<div class="flex items-center justify-between mb-4">
+			<p class="text-sm text-gray-500 dark:text-gray-400">
+				{ fmt.Sprintf("%d files changed", len(result.Files)) }
+			</p>
+			@DiffViewToggle(view)
+		</div>
+		<!-- File list summary -->
+		<div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm mb-4 overflow-hidden">
+			<div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+				<p class="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Changed files</p>
+			</div>
+			<ul class="divide-y divide-gray-100 dark:divide-gray-800">
+				for i, f := range result.Files {
+					<li class="px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800/50">
+						<a href={ templ.SafeURL(fmt.Sprintf("#file-%d", i)) } class="flex items-center gap-2">
+							@fileStatusIcon(f.Status)
+							<span class="font-mono text-xs truncate">{ displayPath(f) }</span>
+						</a>
+					</li>
+				}
+			</ul>
+		</div>
+		<!-- File diffs -->
+		for i, f := range result.Files {
+			@DiffFile(f, i, view)
+		}
+	}
+}
+
+// DiffViewToggle renders the unified/side-by-side switcher.
+templ DiffViewToggle(currentView string) {
+	<div class="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-0.5">
+		<button
+			class={ "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+				templ.KV("bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300", currentView != "split"),
+				templ.KV("text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300", currentView == "split"),
+			}
+			hx-get="?view=unified"
+			hx-target="#diff-container"
+			hx-swap="innerHTML"
+			hx-push-url="false"
+		>
+			Unified
+		</button>
+		<button
+			class={ "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+				templ.KV("bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300", currentView == "split"),
+				templ.KV("text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300", currentView != "split"),
+			}
+			hx-get="?view=split"
+			hx-target="#diff-container"
+			hx-swap="innerHTML"
+			hx-push-url="false"
+		>
+			Split
+		</button>
+	</div>
+}
+
+// DiffFile renders a single file's diff with header and hunks.
+templ DiffFile(f gitclient.FileDiff, fileIdx int, view string) {
+	<div id={ fmt.Sprintf("file-%d", fileIdx) } class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm mb-4 overflow-hidden">
+		@DiffFileHeader(f, fileIdx)
+		<div id={ fmt.Sprintf("file-%d-content", fileIdx) }>
+			if view == "split" {
+				@diffFileSplit(f, fileIdx)
+			} else {
+				@diffFileUnified(f, fileIdx)
+			}
+		</div>
+	</div>
+}
+
+// DiffFileHeader renders the collapsible file header.
+templ DiffFileHeader(f gitclient.FileDiff, fileIdx int) {
+	<div
+		class="flex items-center gap-2 px-4 py-2.5 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800 cursor-pointer select-none"
+		onclick={ toggleFile(fileIdx) }
+	>
+		<svg class="h-4 w-4 text-gray-400 shrink-0 transition-transform" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+			<path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"></path>
+		</svg>
+		@fileStatusBadge(f.Status)
+		<span class="font-mono text-xs text-gray-700 dark:text-gray-300 truncate">{ displayPath(f) }</span>
+		if f.Status == "renamed" && f.OldPath != "" {
+			<span class="text-xs text-gray-400">{ fmt.Sprintf("(was %s)", f.OldPath) }</span>
+		}
+		<span class="ml-auto text-xs text-gray-400">
+			{ fmt.Sprintf("%d hunks", len(f.Hunks)) }
+		</span>
+	</div>
+}
+
+// Unified diff view for a single file.
+templ diffFileUnified(f gitclient.FileDiff, fileIdx int) {
+	<div class="overflow-x-auto">
+		<table class="w-full text-xs font-mono leading-5">
+			for hunkIdx, hunk := range f.Hunks {
+				if hunk.Header != "" {
+					<tr class="bg-blue-50/50 dark:bg-blue-950/20">
+						<td colspan="3" class="px-4 py-1 text-xs text-blue-600 dark:text-blue-400 font-medium">
+							{ hunk.Header }
+						</td>
+					</tr>
+				}
+				for lineIdx, line := range hunk.Lines {
+					<tr
+						id={ anchorID(fileIdx, hunkIdx, line, lineIdx) }
+						class={ lineClass(line.Type) }
+					>
+						<td class="w-12 px-2 py-0 text-right text-gray-400 dark:text-gray-600 select-none border-r border-gray-100 dark:border-gray-800">
+							if line.Type != gitclient.DiffLineAdd {
+								{ lineNum(line.OldNum, lineIdx) }
+							}
+						</td>
+						<td class="w-12 px-2 py-0 text-right text-gray-400 dark:text-gray-600 select-none border-r border-gray-100 dark:border-gray-800">
+							if line.Type != gitclient.DiffLineDelete {
+								{ lineNum(line.NewNum, lineIdx) }
+							}
+						</td>
+						<td class="px-4 py-0 whitespace-pre">
+							<span class={ "select-none inline-block w-4", prefixColor(line.Type) }>{ linePrefix(line.Type) }</span>{ line.Content }
+						</td>
+					</tr>
+				}
+			}
+		</table>
+	</div>
+}
+
+// Side-by-side diff view for a single file.
+templ diffFileSplit(f gitclient.FileDiff, fileIdx int) {
+	<div class="overflow-x-auto">
+		<table class="w-full text-xs font-mono leading-5">
+			<colgroup>
+				<col style="width: 40px"/>
+				<col style="width: 50%"/>
+				<col style="width: 40px"/>
+				<col style="width: 50%"/>
+			</colgroup>
+			for hunkIdx, hunk := range f.Hunks {
+				if hunk.Header != "" {
+					<tr class="bg-blue-50/50 dark:bg-blue-950/20">
+						<td colspan="4" class="px-4 py-1 text-xs text-blue-600 dark:text-blue-400 font-medium">
+							{ hunk.Header }
+						</td>
+					</tr>
+				}
+				for _, pair := range splitLines(hunk.Lines) {
+					<tr>
+						<!-- Left (old) -->
+						if pair.Left != nil {
+							<td class={ "px-2 py-0 text-right select-none border-r border-gray-100 dark:border-gray-800", splitLineNumClass(pair.Left.Type) }>
+								<span class="text-gray-400 dark:text-gray-600">{ lineNum(pair.Left.OldNum, pair.LeftIdx) }</span>
+							</td>
+							<td
+								id={ anchorID(fileIdx, hunkIdx, *pair.Left, pair.LeftIdx) }
+								class={ "px-4 py-0 whitespace-pre border-r border-gray-200 dark:border-gray-700", splitContentClass(pair.Left.Type) }
+							>
+								{ pair.Left.Content }
+							</td>
+						} else {
+							<td class="px-2 py-0 border-r border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/30"></td>
+							<td class="px-4 py-0 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/30"></td>
+						}
+						<!-- Right (new) -->
+						if pair.Right != nil {
+							<td class={ "px-2 py-0 text-right select-none border-r border-gray-100 dark:border-gray-800", splitLineNumClass(pair.Right.Type) }>
+								<span class="text-gray-400 dark:text-gray-600">{ lineNum(pair.Right.NewNum, pair.RightIdx) }</span>
+							</td>
+							<td
+								id={ anchorID(fileIdx, hunkIdx, *pair.Right, pair.RightIdx) }
+								class={ "px-4 py-0 whitespace-pre", splitContentClass(pair.Right.Type) }
+							>
+								{ pair.Right.Content }
+							</td>
+						} else {
+							<td class="px-2 py-0 border-r border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/30"></td>
+							<td class="px-4 py-0 bg-gray-50 dark:bg-gray-800/30"></td>
+						}
+					</tr>
+				}
+			}
+		</table>
+	</div>
+}
+
+// LinePair for side-by-side rendering.
+type LinePair struct {
+	Left     *gitclient.DiffLine
+	Right    *gitclient.DiffLine
+	LeftIdx  int
+	RightIdx int
+}
+
+// splitLines pairs delete/add lines side-by-side, context on both sides.
+func splitLines(lines []gitclient.DiffLine) []LinePair {
+	var pairs []LinePair
+	var deletes, adds []int
+
+	flush := func() {
+		maxLen := len(deletes)
+		if len(adds) > maxLen {
+			maxLen = len(adds)
+		}
+		for i := 0; i < maxLen; i++ {
+			p := LinePair{}
+			if i < len(deletes) {
+				l := lines[deletes[i]]
+				p.Left = &l
+				p.LeftIdx = deletes[i]
+			}
+			if i < len(adds) {
+				r := lines[adds[i]]
+				p.Right = &r
+				p.RightIdx = adds[i]
+			}
+			pairs = append(pairs, p)
+		}
+		deletes = nil
+		adds = nil
+	}
+
+	for i, line := range lines {
+		switch line.Type {
+		case gitclient.DiffLineDelete:
+			deletes = append(deletes, i)
+		case gitclient.DiffLineAdd:
+			adds = append(adds, i)
+		default: // context
+			flush()
+			l := lines[i]
+			pairs = append(pairs, LinePair{Left: &l, Right: &l, LeftIdx: i, RightIdx: i})
+		}
+	}
+	flush()
+
+	return pairs
+}
+
+func displayPath(f gitclient.FileDiff) string {
+	if f.NewPath != "" {
+		return f.NewPath
+	}
+	return f.OldPath
+}
+
+func linePrefix(t gitclient.DiffLineType) string {
+	switch t {
+	case gitclient.DiffLineAdd:
+		return "+"
+	case gitclient.DiffLineDelete:
+		return "-"
+	default:
+		return " "
+	}
+}
+
+func prefixColor(t gitclient.DiffLineType) string {
+	switch t {
+	case gitclient.DiffLineAdd:
+		return "text-emerald-600 dark:text-emerald-400"
+	case gitclient.DiffLineDelete:
+		return "text-red-600 dark:text-red-400"
+	default:
+		return "text-gray-400"
+	}
+}
+
+func lineClass(t gitclient.DiffLineType) string {
+	switch t {
+	case gitclient.DiffLineAdd:
+		return "bg-emerald-50/50 dark:bg-emerald-950/20"
+	case gitclient.DiffLineDelete:
+		return "bg-red-50/50 dark:bg-red-950/20"
+	default:
+		return ""
+	}
+}
+
+func splitLineNumClass(t gitclient.DiffLineType) string {
+	switch t {
+	case gitclient.DiffLineAdd:
+		return "bg-emerald-50/30 dark:bg-emerald-950/10"
+	case gitclient.DiffLineDelete:
+		return "bg-red-50/30 dark:bg-red-950/10"
+	default:
+		return ""
+	}
+}
+
+func splitContentClass(t gitclient.DiffLineType) string {
+	switch t {
+	case gitclient.DiffLineAdd:
+		return "bg-emerald-50/50 dark:bg-emerald-950/20"
+	case gitclient.DiffLineDelete:
+		return "bg-red-50/50 dark:bg-red-950/20"
+	default:
+		return ""
+	}
+}
+
+// anchorID generates stable anchor IDs per ADR-002: F{file}-H{hunk}-{L|R}{line}
+func anchorID(fileIdx int, hunkIdx int, line gitclient.DiffLine, lineIdx int) string {
+	num := lineIdx + 1
+	side := "L"
+	if line.Type == gitclient.DiffLineAdd {
+		side = "R"
+		if line.NewNum > 0 {
+			num = line.NewNum
+		}
+	} else if line.OldNum > 0 {
+		num = line.OldNum
+	}
+	return fmt.Sprintf("F%d-H%d-%s%d", fileIdx, hunkIdx, side, num)
+}
+
+func lineNum(num int, fallbackIdx int) string {
+	if num > 0 {
+		return fmt.Sprintf("%d", num)
+	}
+	return fmt.Sprintf("%d", fallbackIdx+1)
+}
+
+func fileStatusIcon(status string) templ.Component {
+	return fileStatusBadge(status)
+}
+
+templ fileStatusBadge(status string) {
+	switch status {
+		case "added":
+			<span class="inline-flex items-center justify-center h-5 w-5 rounded text-xs font-bold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400">A</span>
+		case "deleted":
+			<span class="inline-flex items-center justify-center h-5 w-5 rounded text-xs font-bold bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-400">D</span>
+		case "renamed":
+			<span class="inline-flex items-center justify-center h-5 w-5 rounded text-xs font-bold bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400">R</span>
+		default:
+			<span class="inline-flex items-center justify-center h-5 w-5 rounded text-xs font-bold bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400">M</span>
+	}
+}
+
+func toggleFile(fileIdx int) templ.ComponentScript {
+	return templ.ComponentScript{
+		Call: fmt.Sprintf("document.getElementById('file-%d-content').classList.toggle('hidden')", fileIdx),
+	}
+}
+
+// Unused import suppression
+var _ = filepath.Base
+var _ = strings.TrimSpace

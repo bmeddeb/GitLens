@@ -1,0 +1,57 @@
+package jobtemplates
+
+import (
+	"fmt"
+	"github.com/user/gitlens-pro/internal/http/templates"
+	"github.com/user/gitlens-pro/internal/jobs"
+)
+
+templ JobListPage(pd templates.PageData, jobList []jobs.Job, nextCursor string) {
+	@templates.Layout(pd) {
+		@JobListContent(jobList, nextCursor)
+	}
+}
+
+templ JobListContent(jobList []jobs.Job, nextCursor string) {
+	<div class="space-y-6">
+		<div>
+			<h2 class="text-2xl font-bold tracking-tight">Jobs</h2>
+			<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Clone, sync, and analysis jobs across your repositories.</p>
+		</div>
+		if len(jobList) == 0 {
+			@templates.EmptyState("No jobs yet", "Jobs are created automatically when you add or sync repositories.")
+		} else {
+			<div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
+				<table class="w-full text-sm">
+					<thead>
+						<tr class="border-b border-gray-100 dark:border-gray-800 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+							<th class="px-5 py-3">ID</th>
+							<th class="px-5 py-3">Type</th>
+							<th class="px-5 py-3">Status</th>
+							<th class="px-5 py-3">Progress</th>
+							<th class="px-5 py-3">Created</th>
+							<th class="px-5 py-3"></th>
+						</tr>
+					</thead>
+					<tbody id="job-table-body" class="divide-y divide-gray-100 dark:divide-gray-800">
+						for _, j := range jobList {
+							@JobRow(j)
+						}
+					</tbody>
+				</table>
+			</div>
+			if nextCursor != "" {
+				@templates.LoadMore(fmt.Sprintf("/fragments/job-rows?cursor=%s", nextCursor))
+			}
+		}
+	</div>
+}
+
+templ JobRows(jobList []jobs.Job, nextCursor string) {
+	for _, j := range jobList {
+		@JobRow(j)
+	}
+	if nextCursor != "" {
+		@templates.LoadMore(fmt.Sprintf("/fragments/job-rows?cursor=%s", nextCursor))
+	}
+}

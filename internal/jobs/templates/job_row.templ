@@ -1,0 +1,100 @@
+package jobtemplates
+
+import (
+	"fmt"
+	"github.com/user/gitlens-pro/internal/http/templates"
+	"github.com/user/gitlens-pro/internal/jobs"
+)
+
+templ JobRow(j jobs.Job) {
+	<tr
+		id={ fmt.Sprintf("job-%d", j.ID) }
+		if !j.Status.IsTerminal() {
+			hx-get={ fmt.Sprintf("/fragments/job-row/%d", j.ID) }
+			hx-trigger="every 3s"
+			hx-swap="outerHTML"
+		}
+	>
+		<td class="px-5 py-3 font-mono text-xs text-gray-500 dark:text-gray-400">
+			{ fmt.Sprintf("#%d", j.ID) }
+		</td>
+		<td class="px-5 py-3">
+			@JobTypeBadge(j.Type)
+		</td>
+		<td class="px-5 py-3">
+			@JobStatusBadge(j.Status)
+		</td>
+		<td class="px-5 py-3">
+			if j.Status == jobs.JobStatusRunning || j.Status == jobs.JobStatusPending {
+				<div class="flex items-center gap-2">
+					<div class="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+						<div
+							class="h-full rounded-full bg-indigo-500 transition-all duration-500"
+							style={ fmt.Sprintf("width: %d%%", j.ProgressPct) }
+						></div>
+					</div>
+					<span class="text-xs text-gray-500 dark:text-gray-400 tabular-nums">{ fmt.Sprintf("%d%%", j.ProgressPct) }</span>
+				</div>
+				if j.ProgressMessage != nil {
+					<p class="mt-0.5 text-xs text-gray-400 dark:text-gray-500 truncate max-w-48">{ *j.ProgressMessage }</p>
+				}
+			} else if j.Status == jobs.JobStatusFailed && j.ErrorMessage != nil {
+				<p class="text-xs text-red-500 dark:text-red-400 truncate max-w-48" title={ *j.ErrorMessage }>{ *j.ErrorMessage }</p>
+			} else if j.Status == jobs.JobStatusCompleted {
+				<span class="text-xs text-gray-400">Done</span>
+			} else {
+				<span class="text-xs text-gray-400">—</span>
+			}
+		</td>
+		<td class="px-5 py-3 text-xs text-gray-500 dark:text-gray-400">
+			{ j.CreatedAt.Format("Jan 2 15:04") }
+		</td>
+		<td class="px-5 py-3 text-right">
+			if j.Status == jobs.JobStatusPending {
+				<button
+					hx-post={ fmt.Sprintf("/api/jobs/%d/cancel", j.ID) }
+					hx-swap="none"
+					class="text-xs text-red-500 hover:text-red-600 dark:hover:text-red-400 font-medium"
+				>
+					Cancel
+				</button>
+			}
+		</td>
+	</tr>
+}
+
+templ JobTypeBadge(t jobs.JobType) {
+	switch t {
+		case jobs.JobTypeClone:
+			@templates.Badge("Clone", "blue")
+		case jobs.JobTypeSync:
+			@templates.Badge("Sync", "purple")
+		case jobs.JobTypeForkAnalysis:
+			@templates.Badge("Fork Analysis", "yellow")
+		default:
+			@templates.Badge(string(t), "")
+	}
+}
+
+templ JobStatusBadge(s jobs.JobStatus) {
+	switch s {
+		case jobs.JobStatusCompleted:
+			@templates.Badge("Completed", "green")
+		case jobs.JobStatusRunning:
+			<span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20">
+				<svg class="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+				</svg>
+				Running
+			</span>
+		case jobs.JobStatusPending:
+			@templates.Badge("Pending", "yellow")
+		case jobs.JobStatusFailed:
+			@templates.Badge("Failed", "red")
+		case jobs.JobStatusCancelled:
+			@templates.Badge("Cancelled", "")
+		default:
+			@templates.Badge(string(s), "")
+	}
+}
